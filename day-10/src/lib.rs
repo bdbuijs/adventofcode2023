@@ -18,73 +18,30 @@ pub fn process_part2(input: &str) -> String {
     assert!(input.is_empty());
     let looop = find_loop(&field);
     let (x, y) = looop[0];
-    let max_x = field[0].len() - 1;
-    let max_y = field.len() - 1;
-    let north = if y > 0 {
-        if let Some(p) = &field[y - 1][x] {
-            match p {
-                Pipe::NorthSouth | Pipe::SouthWest | Pipe::SouthEast => true,
-                _ => {
-                    false // not connected to Start
-                }
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-    let west = if x > 0 {
-        if let Some(p) = &field[y][x - 1] {
-            match p {
-                Pipe::EastWest | Pipe::NorthEast | Pipe::SouthEast => true,
-                _ => {
-                    false // not connected to Start}
-                }
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-    let east = if x < max_x {
-        if let Some(p) = &field[y][x + 1] {
-            match p {
-                Pipe::EastWest | Pipe::NorthWest | Pipe::SouthWest => true,
-                _ => {
-                    false // not connected to Start}
-                }
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-    let south = if y < max_y {
-        if let Some(p) = &field[y + 1][x] {
-            match p {
-                Pipe::NorthSouth | Pipe::NorthWest | Pipe::NorthEast => true,
-                _ => {
-                    false // not connected to Start}
-                }
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-    let start_pipe = match (north, south, east, west) {
-        (true, true, false, false) => Pipe::NorthSouth,
-        (true, false, true, false) => Pipe::NorthEast,
-        (true, false, false, true) => Pipe::NorthWest,
-        (false, true, true, false) => Pipe::SouthEast,
-        (false, true, false, true) => Pipe::SouthWest,
-        (false, false, true, true) => Pipe::EastWest,
-        _ => unreachable!("Valid start should be connected to exactly 2 other pipes"),
-    };
+    // let max_x = field[0].len() - 1;
+    // let max_y = field.len() - 1;
+
+    let north = matches!(
+        y.checked_sub(1)
+            .and_then(|y| field.get(y).and_then(|row| row.get(x))),
+        Some(Some((_, true, _, _)))
+    );
+    let south = matches!(
+        field.get(y + 1).and_then(|row| row.get(x)),
+        Some(Some((true, _, _, _)))
+    );
+
+    let east = matches!(
+        field.get(y).and_then(|row| row.get(x + 1)),
+        Some(Some((_, _, _, true)))
+    );
+    let west = matches!(
+        x.checked_sub(1)
+            .and_then(|x| field.get(y).and_then(|row| row.get(x))),
+        Some(Some((_, _, true, _)))
+    );
+
+    let start_pipe = (north, south, east, west);
     let _ = field
         .get_mut(y)
         .expect("Must be start")
@@ -104,8 +61,7 @@ pub fn process_part2(input: &str) -> String {
         .map(|row| {
             let (_, insides) = row.into_iter().fold(((false, false), 0), |acc, e| {
                 let ((crossed_north, crossed_south), insides) = acc;
-                if let Some(pipe) = e {
-                    let (n, s) = evaluate(&pipe);
+                if let Some((n, s, _, _)) = e {
                     ((crossed_north ^ n, crossed_south ^ s), insides)
                 } else if crossed_north && crossed_south {
                     // we've crossed an 'odd' number of loop lines and are thus inside the loop
@@ -121,9 +77,7 @@ pub fn process_part2(input: &str) -> String {
     insides.to_string()
 }
 
-fn find_loop(field: &Vec<Vec<Option<Pipe>>>) -> Vec<(usize, usize)> {
-    let max_x = field[0].len() - 1;
-    let max_y = field.len() - 1;
+fn find_loop(field: &[Vec<Option<Pipe>>]) -> Vec<(usize, usize)> {
     let mut queue = VecDeque::new();
     let mut looop = Vec::new();
     let start = field
@@ -131,190 +85,113 @@ fn find_loop(field: &Vec<Vec<Option<Pipe>>>) -> Vec<(usize, usize)> {
         .enumerate()
         .find_map(|(y, row)| {
             row.iter()
-                .position(|e| e == &Some(Pipe::Start))
+                .position(|e| e == &Some((true, true, true, true)))
                 .map(|x| (x, y))
         })
         .expect("There's always a start!");
 
     looop.push(start);
-    queue.push_back((start, 0_usize, Direction::North));
+    queue.push_back((start, 0_usize, Direction::Start));
 
     while let Some(((x, y), step, direction)) = queue.pop_front() {
-        if let Some(pipe) = &field[y][x] {
-            match pipe {
-                Pipe::Start => {
-                    if step == 0 {
-                        // we're starting!
-                        // look north
-                        if y > 0 {
-                            if let Some(p) = &field[y - 1][x] {
-                                match p {
-                                    Pipe::NorthSouth | Pipe::SouthWest | Pipe::SouthEast => {
-                                        let coords = (x, y - 1);
-                                        looop.push(coords);
-                                        queue.push_back((coords, 1, Direction::North));
-                                        continue;
-                                    }
-                                    _ => { // not connected to Start}
-                                    }
-                                }
-                            }
-                        }
-                        // look west
-                        if x > 0 {
-                            if let Some(p) = &field[y][x - 1] {
-                                match p {
-                                    Pipe::EastWest | Pipe::NorthEast | Pipe::SouthEast => {
-                                        let coords = (x - 1, y);
-                                        looop.push(coords);
-                                        queue.push_back((coords, 1, Direction::West));
-                                        continue;
-                                    }
-                                    _ => { // not connected to Start}
-                                    }
-                                }
-                            }
-                        }
-                        // look east
-                        if x < max_x {
-                            if let Some(p) = &field[y][x + 1] {
-                                match p {
-                                    Pipe::EastWest | Pipe::NorthWest | Pipe::SouthWest => {
-                                        let coords = (x + 1, y);
-                                        looop.push(coords);
-                                        queue.push_back((coords, 1, Direction::East));
-                                        continue;
-                                    }
-                                    _ => { // not connected to Start}
-                                    }
-                                }
-                            }
-                        }
-                        // look south
-                        if y < max_y {
-                            if let Some(p) = &field[y + 1][x] {
-                                match p {
-                                    Pipe::NorthSouth | Pipe::NorthWest | Pipe::NorthEast => {
-                                        let coords = (x, y + 1);
-                                        looop.push(coords);
-                                        queue.push_back((coords, 1, Direction::South));
-                                        continue;
-                                    }
-                                    _ => { // not connected to Start}
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // we're at the end!
-                        break;
-                    }
-                }
-                Pipe::NorthSouth => {
-                    if y > 0 && direction == Direction::North {
-                        let coords = (x, y - 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::North));
-                    }
-                    if y < max_y && direction == Direction::South {
-                        let coords = (x, y + 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::South));
-                    }
-                }
-                Pipe::EastWest => {
-                    if x > 0 && direction == Direction::West {
-                        let coords = (x - 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::West));
-                    }
-                    if x < max_x && direction == Direction::East {
-                        let coords = (x + 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::East));
-                    }
-                }
-                Pipe::NorthEast => {
-                    if y > 0 && direction == Direction::West {
-                        let coords = (x, y - 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::North));
-                    }
-                    if x < max_x && direction == Direction::South {
-                        let coords = (x + 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::East));
-                    }
-                }
-                Pipe::NorthWest => {
-                    if y > 0 && direction == Direction::East {
-                        let coords = (x, y - 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::North));
-                    }
-                    if x > 0 && direction == Direction::South {
-                        let coords = (x - 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::West));
-                    }
-                }
-                Pipe::SouthWest => {
-                    if y < max_y && direction == Direction::East {
-                        let coords = (x, y + 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::South));
-                    }
-                    if x > 0 && direction == Direction::North {
-                        let coords = (x - 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::West));
-                    }
-                }
-                Pipe::SouthEast => {
-                    if y < max_y && direction == Direction::West {
-                        let coords = (x, y + 1);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::South));
-                    }
-                    if x < max_x && direction == Direction::North {
-                        let coords = (x + 1, y);
-                        looop.push(coords);
-                        queue.push_back((coords, step + 1, Direction::East));
-                    }
+        let (coords, dir) = match direction {
+            Direction::Start => {
+                if let Some(Some((_, true, _, _))) = y
+                    .checked_sub(1)
+                    .and_then(|y| field.get(y).and_then(|row| row.get(x)))
+                {
+                    ((x, y - 1), Direction::North)
+                } else if let Some(Some((_, _, true, _))) = x
+                    .checked_sub(1)
+                    .and_then(|x| field.get(y).and_then(|row| row.get(x)))
+                {
+                    ((x - 1, y), Direction::West)
+                } else if let Some(Some((_, _, _, true))) =
+                    field.get(y).and_then(|row| row.get(x + 1))
+                {
+                    ((x + 1, y), Direction::East)
+                } else if let Some(Some((true, _, _, _))) =
+                    field.get(y + 1).and_then(|row| row.get(x))
+                {
+                    ((x, y + 1), Direction::South)
+                } else {
+                    unreachable!("Start must go somewhere")
                 }
             }
-        }
+            Direction::North => {
+                if let Some(pipe) = field[y][x] {
+                    match pipe {
+                        (true, true, false, false) => ((x, y - 1), Direction::North),
+                        (false, true, true, false) => ((x + 1, y), Direction::East),
+                        (false, true, false, true) => ((x - 1, y), Direction::West),
+                        (true, true, true, true) => {
+                            break;
+                        }
+                        _ => unreachable!("Shouldn't be a dead end {:?}", pipe),
+                    }
+                } else {
+                    unreachable!("Shouldn't get off track")
+                }
+            }
+            Direction::South => {
+                if let Some(pipe) = field[y][x] {
+                    match pipe {
+                        (true, true, false, false) => ((x, y + 1), Direction::South),
+                        (true, false, true, false) => ((x + 1, y), Direction::East),
+                        (true, false, false, true) => ((x - 1, y), Direction::West),
+                        (true, true, true, true) => {
+                            break;
+                        }
+                        _ => unreachable!("Shouldn't be a dead end {:?}", pipe),
+                    }
+                } else {
+                    unreachable!("Shouldn't get off track")
+                }
+            }
+            Direction::East => {
+                if let Some(pipe) = field[y][x] {
+                    match pipe {
+                        (true, false, false, true) => ((x, y - 1), Direction::North),
+                        (false, true, false, true) => ((x, y + 1), Direction::South),
+                        (false, false, true, true) => ((x + 1, y), Direction::East),
+                        (true, true, true, true) => {
+                            break;
+                        }
+                        _ => unreachable!("Shouldn't be a dead end {:?}", pipe),
+                    }
+                } else {
+                    unreachable!("Shouldn't get off track")
+                }
+            }
+            Direction::West => {
+                if let Some(pipe) = field[y][x] {
+                    match pipe {
+                        (true, false, true, false) => ((x, y - 1), Direction::North),
+                        (false, true, true, false) => ((x, y + 1), Direction::South),
+                        (false, false, true, true) => ((x - 1, y), Direction::West),
+                        (true, true, true, true) => {
+                            break;
+                        }
+                        _ => unreachable!("Shouldn't be a dead end {:?}", pipe),
+                    }
+                } else {
+                    unreachable!("Shouldn't get off track")
+                }
+            }
+        };
+        looop.push(coords);
+        queue.push_back((coords, step + 1, dir));
     }
 
     looop.pop(); // remove extraneous start
     looop
 }
 
-fn evaluate(pipe: &Pipe) -> (bool, bool) {
-    // (north, south)
-    match pipe {
-        Pipe::Start => unreachable!(), // Start is really NorthSouth in the input, kinda cheating, could've figured this out with code, but who cares?
-        Pipe::NorthSouth => (true, true),
-        Pipe::EastWest => (false, false),
-        Pipe::NorthEast => (true, false),
-        Pipe::NorthWest => (true, false),
-        Pipe::SouthWest => (false, true),
-        Pipe::SouthEast => (false, true),
-    }
-}
+type Pipe = (bool, bool, bool, bool); // (north, south, east, west)
 
 #[derive(Debug, PartialEq, Eq)]
-enum Pipe {
-    Start,
-    NorthSouth, // |
-    EastWest,   // -
-    NorthEast,  // L
-    NorthWest,  // J
-    SouthWest,  // 7
-    SouthEast,  // F
-}
-#[derive(Debug, PartialEq, Eq)]
 enum Direction {
+    Start,
     North,
     South,
     East,
@@ -336,13 +213,13 @@ fn parse_line(input: &str) -> IResult<&str, Line> {
 fn parse_pipe(input: &str) -> IResult<&str, Option<Pipe>> {
     let (input, c) = one_of("S|-LJ7F.")(input)?;
     let pipe = match c {
-        'S' => Some(Pipe::Start),
-        '|' => Some(Pipe::NorthSouth),
-        '-' => Some(Pipe::EastWest),
-        'L' => Some(Pipe::NorthEast),
-        'J' => Some(Pipe::NorthWest),
-        '7' => Some(Pipe::SouthWest),
-        'F' => Some(Pipe::SouthEast),
+        'S' => Some((true, true, true, true)),
+        '|' => Some((true, true, false, false)),
+        '-' => Some((false, false, true, true)),
+        'L' => Some((true, false, true, false)),
+        'J' => Some((true, false, false, true)),
+        '7' => Some((false, true, false, true)),
+        'F' => Some((false, true, true, false)),
         '.' => None,
         _ => unreachable!(),
     };
