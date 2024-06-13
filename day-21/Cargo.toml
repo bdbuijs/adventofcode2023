@@ -1,0 +1,8 @@
+[package]
+name = "day-21"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "answer"
+path = "src/lib.rs"
